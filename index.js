@@ -28,6 +28,7 @@ async function run() {
 
     // collections
     const jobsCollection = client.db('jobPortal').collection('jobs');
+    const applicationCollection = client.db('jobPortal').collection('job_application');
 
     app.get('/jobs', async(req, res) => {
       const cursor = jobsCollection.find();
@@ -40,7 +41,44 @@ async function run() {
       const quary = {_id : new ObjectId(id)};
       const result = await jobsCollection.findOne(quary);
       res.send(result);
-    })
+    });
+
+    // job application api
+    app.post('/job-applications', async(req, res) =>{
+        const application = req.body;
+        const result = await applicationCollection.insertOne(application);
+        res.send(result);
+
+    });
+
+    app.get('/job-application', async(req, res) => {
+      const email = req.query.email;
+      const query = {applicant_email: email}; 
+      const result = await applicationCollection.find(query).toArray();
+
+      for(const application of result){
+        const query1 = {_id: new ObjectId(application.job_id)};
+        const job = await jobsCollection.findOne(query1);
+
+        if(job){
+          application.title = job.title;
+          application.company = job.company;
+          application.company_logo = job.company_logo
+        }
+      }
+
+      res.send(result)
+    });
+
+    app.delete('/job-application/:id', async(req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await applicationCollection.deleteOne(query);
+      res.send(result);
+  });
+  
+
+
 
   } finally {
     // await client.close();
