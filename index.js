@@ -9,9 +9,14 @@ const port = process.env.PORT || 5000;
 
 // Middleware
 app.use(cors({
-  origin: ['http://localhost:5173'],
+  origin: [
+    'http://localhost:5173',
+     'https://career-code.web.app',
+     'https://career-code.firebaseapp.com'
+     ],
   credentials: true
 }));
+
 app.use(express.json());
 app.use(cookieParser())
 
@@ -28,12 +33,14 @@ const varifyToken = (req, res, next) => {
       return res.status(401).send({message: 'Unuthorized Access'});
     }
 
+    req.user = decoded;
+
     next();
 
   })
 
 
-}
+};
 
 // MongoDB URI
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.1bvy3.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
@@ -48,8 +55,8 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    await client.connect();
-    console.log("Connected to MongoDB!");
+    // await client.connect();
+    // console.log("Connected to MongoDB!");
 
     // Collections
     const jobsCollection = client.db('jobPortal').collection('jobs');
@@ -136,7 +143,10 @@ async function run() {
     app.get('/job-application', varifyToken, async (req, res) => {
       const email = req.query.email;
 
-      // console.log(req.cookies?.token)
+      console.log(req.cookies?.token)
+      if(req.user.email !== req.query.email){
+        return res.status(403).send({message: 'Forbidden Access'})
+      }
 
       try {
         const applications = await applicationCollection.find({ applicant_email: email }).toArray();
@@ -161,11 +171,13 @@ async function run() {
     // JWT
     app.post('/jwt', async(req, res) =>{
       const user = req.body;
-      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {expiresIn: '6h'})
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {expiresIn: '10h'})
      
       res.cookie('token', token, {
         httpOnly: true,
-        secure: false
+        secure: process.env.NODE_ENV=== 'production',
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+
       })
       .send({success: true})
     });
@@ -173,7 +185,9 @@ async function run() {
     app.post('/logout', (req, res) => {
       res.clearCookie('token', {
         httpOnly: true,
-        secure: false
+        secure: process.env.NODE_ENV=== 'production',
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+
       })
       .send({success: true})
     })
